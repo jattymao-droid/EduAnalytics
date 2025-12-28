@@ -1,0 +1,5 @@
+{
+  "name": "EduAnalytics - Student Grade Management System",
+  "description": "A comprehensive grade management platform for teachers and parents, featuring Excel imports, interactive dashboards, and AI-powered student performance analysis using Gemini.",
+  "requestFramePermissions": []
+}

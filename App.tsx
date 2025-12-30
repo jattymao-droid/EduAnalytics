@@ -1,11 +1,10 @@
-
 import React, { useState, useEffect } from 'react';
-import { db } from './store';
-import { User, UserRole, School } from './types';
-import Login from './pages/Login';
-import TeacherDashboard from './pages/TeacherDashboard';
-import ParentDashboard from './pages/ParentDashboard';
-import AdminDashboard from './pages/AdminDashboard';
+import { db } from './store.ts';
+import { User, UserRole, School } from './types.ts';
+import Login from './pages/Login.tsx';
+import TeacherDashboard from './pages/TeacherDashboard.tsx';
+import ParentDashboard from './pages/ParentDashboard.tsx';
+import AdminDashboard from './pages/AdminDashboard.tsx';
 
 const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
@@ -14,29 +13,31 @@ const App: React.FC = () => {
   const [inviteCode, setInviteCode] = useState<string | null>(null);
 
   useEffect(() => {
-    db.init();
-    
-    // Check for invite code in URL
-    const urlParams = new URLSearchParams(window.location.search);
-    const code = urlParams.get('invite');
-    if (code) {
-      setInviteCode(code);
-    }
+    const init = async () => {
+      await db.init();
+      
+      const urlParams = new URLSearchParams(window.location.search);
+      const code = urlParams.get('invite');
+      if (code) {
+        setInviteCode(code);
+      }
 
-    const currentUser = db.getCurrentUser();
-    setUser(currentUser);
-    if (currentUser?.schoolId) {
-      const schools = db.getSchools();
-      setSchool(schools.find(s => s.id === currentUser.schoolId) || null);
-    }
-    setLoading(false);
+      const currentUser = db.getCurrentUser();
+      setUser(currentUser);
+      if (currentUser?.schoolId) {
+        const schools = await db.getSchools();
+        setSchool(schools.find(s => s.id === currentUser.schoolId) || null);
+      }
+      setLoading(false);
+    };
+    init();
   }, []);
 
-  const handleLogin = (userData: User) => {
+  const handleLogin = async (userData: User) => {
     db.setCurrentUser(userData);
     setUser(userData);
     if (userData.schoolId) {
-      const schools = db.getSchools();
+      const schools = await db.getSchools();
       setSchool(schools.find(s => s.id === userData.schoolId) || null);
     } else {
       setSchool(null);

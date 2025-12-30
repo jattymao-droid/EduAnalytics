@@ -97,5 +97,18 @@ export interface AIAnalysisReport {
   suggestions: string[];
 }
 
+export interface AIPredictionReport {
+  predictedExamName: string;
+  confidenceScore: number; // 0-100
+  predictedScores: {
+    subject: string;
+    range: string;
+    trend: 'rising' | 'falling' | 'stable';
+  }[];
+  potentialGrowthAreas: string[];
+  riskFactors: string[];
+  strategicAdvice: string;
+}
+
 // 定义常用学科常量
 export const DEFAULT_SUBJECTS = ['语文', '数学', '英语', '物理', '化学', '生物', '历史', '地理', '政治', '体育', '美术', '音乐'];

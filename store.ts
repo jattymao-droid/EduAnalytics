@@ -1,102 +1,136 @@
+import { User, Student, Exam, GradeRecord, UserRole, School, Semester, GradeLevel, SchoolClass, Invitation } from './types.ts';
 
-import { User, Student, Exam, GradeRecord, UserRole, School, Semester, GradeLevel, SchoolClass, Invitation } from './types';
+const STORAGE_KEY = 'edu_analytics_local_db';
 
-const STORAGE_KEYS = {
-  SCHOOLS: 'edu_schools',
-  SEMESTERS: 'edu_semesters',
-  GRADES: 'edu_grade_levels',
-  CLASSES: 'edu_school_classes',
-  USERS: 'edu_users',
-  STUDENTS: 'edu_students',
-  EXAMS: 'edu_exams',
-  GRADES_DATA: 'edu_grades_records',
-  CURRENT_USER: 'edu_current_user',
-  INVITATIONS: 'edu_invitations'
+interface LocalDB {
+  schools: School[];
+  users: User[];
+  semesters: Semester[];
+  gradeLevels: GradeLevel[];
+  classes: SchoolClass[];
+  students: Student[];
+  exams: Exam[];
+  gradeRecords: GradeRecord[];
+  invitations: Invitation[];
+}
+
+const defaultDB: LocalDB = {
+  schools: [],
+  users: [
+    { id: 'u_admin', username: 'admin', password: 'password', role: UserRole.ADMIN }
+  ],
+  semesters: [],
+  gradeLevels: [],
+  classes: [],
+  students: [],
+  exams: [],
+  gradeRecords: [],
+  invitations: []
 };
 
-const get = <T>(key: string): T[] => JSON.parse(localStorage.getItem(key) || '[]');
-const set = (key: string, data: any) => localStorage.setItem(key, JSON.stringify(data));
+const getDB = (): LocalDB => {
+  const data = localStorage.getItem(STORAGE_KEY);
+  if (!data) return defaultDB;
+  try {
+    return JSON.parse(data);
+  } catch (e) {
+    return defaultDB;
+  }
+};
+
+const saveDB = (db: LocalDB) => {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
+};
 
 export const db = {
-  // Global
-  getSchools: () => get<School>(STORAGE_KEYS.SCHOOLS),
-  saveSchools: (data: School[]) => set(STORAGE_KEYS.SCHOOLS, data),
-  
-  getUsers: () => get<User>(STORAGE_KEYS.USERS),
-  saveUsers: (data: User[]) => set(STORAGE_KEYS.USERS, data),
-
-  getCurrentUser: (): User | null => JSON.parse(localStorage.getItem(STORAGE_KEYS.CURRENT_USER) || 'null'),
-  setCurrentUser: (user: User | null) => localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(user)),
-
-  getInvitations: () => get<Invitation>(STORAGE_KEYS.INVITATIONS),
-  saveInvitations: (data: Invitation[], schoolId: string) => {
-    const others = get<Invitation>(STORAGE_KEYS.INVITATIONS).filter(i => i.schoolId !== schoolId);
-    set(STORAGE_KEYS.INVITATIONS, [...others, ...data]);
+  // Global & Auth
+  getSchools: async () => getDB().schools,
+  saveSchools: async (data: School[]) => {
+    const d = getDB();
+    d.schools = data;
+    saveDB(d);
   },
-  getInvitationByCode: (code: string) => get<Invitation>(STORAGE_KEYS.INVITATIONS).find(i => i.code === code),
+  
+  getUsers: async () => getDB().users,
+  saveUsers: async (data: User[]) => {
+    const d = getDB();
+    d.users = data;
+    saveDB(d);
+  },
+
+  login: async (username: string, password: string) => {
+    const dbData = getDB();
+    const user = dbData.users.find(u => u.username === username && u.password === password);
+    if (!user) throw new Error('用户名或密码错误');
+    return user;
+  },
+
+  getCurrentUser: (): User | null => {
+    const stored = localStorage.getItem('edu_current_user');
+    return stored ? JSON.parse(stored) : null;
+  },
+  
+  setCurrentUser: (user: User | null) => {
+    if (user) localStorage.setItem('edu_current_user', JSON.stringify(user));
+    else localStorage.removeItem('edu_current_user');
+  },
 
   // Scoped by School
-  getSemesters: (schoolId: string) => get<Semester>(STORAGE_KEYS.SEMESTERS).filter(s => s.schoolId === schoolId),
-  saveSemesters: (data: Semester[], schoolId: string) => {
-    const all = get<Semester>(STORAGE_KEYS.SEMESTERS).filter(s => s.schoolId !== schoolId);
-    set(STORAGE_KEYS.SEMESTERS, [...all, ...data]);
+  getSemesters: async (schoolId: string) => getDB().semesters.filter(s => s.schoolId === schoolId),
+  saveSemesters: async (data: Semester[], schoolId: string) => {
+    const d = getDB();
+    d.semesters = [...d.semesters.filter(s => s.schoolId !== schoolId), ...data];
+    saveDB(d);
+  },
+  
+  getGradeLevels: async (schoolId: string) => getDB().gradeLevels.filter(g => g.schoolId === schoolId),
+  saveGradeLevels: async (data: GradeLevel[], schoolId: string) => {
+    const d = getDB();
+    d.gradeLevels = [...d.gradeLevels.filter(g => g.schoolId !== schoolId), ...data];
+    saveDB(d);
+  },
+  
+  getClasses: async (schoolId: string) => getDB().classes.filter(c => c.schoolId === schoolId),
+  saveClasses: async (data: SchoolClass[], schoolId: string) => {
+    const d = getDB();
+    d.classes = [...d.classes.filter(c => c.schoolId !== schoolId), ...data];
+    saveDB(d);
+  },
+  
+  getStudents: async (schoolId?: string) => {
+    const d = getDB();
+    return schoolId ? d.students.filter(s => s.schoolId === schoolId) : d.students;
+  },
+  saveStudents: async (data: Student[], schoolId: string) => {
+    const d = getDB();
+    d.students = [...d.students.filter(s => s.schoolId !== schoolId), ...data];
+    saveDB(d);
   },
 
-  getGradeLevels: (schoolId: string) => get<GradeLevel>(STORAGE_KEYS.GRADES).filter(g => g.schoolId === schoolId),
-  saveGradeLevels: (data: GradeLevel[], schoolId: string) => {
-    const all = get<GradeLevel>(STORAGE_KEYS.GRADES).filter(g => g.schoolId !== schoolId);
-    set(STORAGE_KEYS.GRADES, [...all, ...data]);
+  getExams: async (schoolId: string) => getDB().exams.filter(e => e.schoolId === schoolId),
+  saveExams: async (data: Exam[], schoolId: string) => {
+    const d = getDB();
+    d.exams = [...d.exams.filter(e => e.schoolId !== schoolId), ...data];
+    saveDB(d);
   },
 
-  getClasses: (schoolId: string) => get<SchoolClass>(STORAGE_KEYS.CLASSES).filter(c => c.schoolId === schoolId),
-  saveClasses: (data: SchoolClass[], schoolId: string) => {
-    const all = get<SchoolClass>(STORAGE_KEYS.CLASSES).filter(c => c.schoolId !== schoolId);
-    set(STORAGE_KEYS.CLASSES, [...all, ...data]);
+  getGrades: async (schoolId: string) => getDB().gradeRecords.filter(g => g.schoolId === schoolId),
+  saveGrades: async (data: GradeRecord[], schoolId: string) => {
+    const d = getDB();
+    d.gradeRecords = [...d.gradeRecords.filter(g => g.schoolId !== schoolId), ...data];
+    saveDB(d);
   },
 
-  getStudents: (schoolId?: string) => {
-    const all = get<Student>(STORAGE_KEYS.STUDENTS);
-    return schoolId ? all.filter(s => s.schoolId === schoolId) : all;
+  // Invitation management
+  getInvitations: async () => getDB().invitations,
+  saveInvitations: async (data: Invitation[], schoolId: string) => {
+    const d = getDB();
+    d.invitations = [...d.invitations.filter(i => i.schoolId !== schoolId), ...data];
+    saveDB(d);
   },
-  saveStudents: (data: Student[], schoolId: string) => {
-    const otherSchools = get<Student>(STORAGE_KEYS.STUDENTS).filter(s => s.schoolId !== schoolId);
-    set(STORAGE_KEYS.STUDENTS, [...otherSchools, ...data]);
-  },
+  getInvitationByCode: async (code: string) => getDB().invitations.find(i => i.code === code) || null,
 
-  getExams: (schoolId: string) => get<Exam>(STORAGE_KEYS.EXAMS).filter(e => e.schoolId === schoolId),
-  saveExams: (data: Exam[], schoolId: string) => {
-    const others = get<Exam>(STORAGE_KEYS.EXAMS).filter(e => e.schoolId !== schoolId);
-    set(STORAGE_KEYS.EXAMS, [...others, ...data]);
-  },
-
-  getGrades: (schoolId: string) => get<GradeRecord>(STORAGE_KEYS.GRADES_DATA).filter(g => g.schoolId === schoolId),
-  saveGrades: (data: GradeRecord[], schoolId: string) => {
-    const actualOthers = get<GradeRecord>(STORAGE_KEYS.GRADES_DATA).filter(g => g.schoolId !== schoolId);
-    set(STORAGE_KEYS.GRADES_DATA, [...actualOthers, ...data]);
-  },
-
-  deleteExam: (examId: string, schoolId: string) => {
-    const exams = get<Exam>(STORAGE_KEYS.EXAMS).filter(e => e.id !== examId);
-    set(STORAGE_KEYS.EXAMS, exams);
-    const grades = get<GradeRecord>(STORAGE_KEYS.GRADES_DATA).filter(g => g.examId !== examId);
-    set(STORAGE_KEYS.GRADES_DATA, grades);
-  },
-
-  init: () => {
-    if (get(STORAGE_KEYS.USERS).length === 0) {
-      const schoolId = 'sch_demo';
-      set(STORAGE_KEYS.SCHOOLS, [{ id: schoolId, name: '第一实验中学', motto: '勤学慎思，敦品励行' }]);
-      set(STORAGE_KEYS.SEMESTERS, [{ id: 'sem_1', schoolId, name: '2023-2024学年第二学期', isCurrent: true }]);
-      set(STORAGE_KEYS.GRADES, [{ id: 'gl_1', schoolId, name: '初三' }]);
-      set(STORAGE_KEYS.CLASSES, [{ id: 'cl_1', schoolId, gradeId: 'gl_1', name: '1班' }]);
-      set(STORAGE_KEYS.USERS, [
-        { id: 'u_admin', username: 'admin', password: 'password', role: UserRole.ADMIN, schoolId },
-        { id: 'u_teacher', username: 'teacher', password: 'password', role: UserRole.TEACHER, schoolId }
-      ]);
-      set(STORAGE_KEYS.STUDENTS, [
-        { id: 's1', schoolId, name: '张三', gradeId: 'gl_1', classId: 'cl_1', studentNo: '2024001' },
-        { id: 's2', schoolId, name: '李四', gradeId: 'gl_1', classId: 'cl_1', studentNo: '2024002' }
-      ]);
-    }
+  init: async () => {
+    console.log("EduAnalytics: Mock Local Storage DB ready.");
   }
 };
